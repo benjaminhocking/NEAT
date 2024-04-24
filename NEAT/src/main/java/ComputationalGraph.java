@@ -3,14 +3,70 @@ import java.util.*;
 
 public class ComputationalGraph {
     private List<Node> nodes;
+    public boolean valid;
     public ComputationalGraph(Genome genome) {
         this.nodes = new ArrayList<>();
-        this.buildGraph(genome);
+        this.valid = this.buildGraph(genome);
     }
 
-    private void buildGraph(Genome genome){
+
+
+    public List<Integer> getNodeNs(){
+        return this.nodes.stream().map(Node::getNodeN).toList();
+    }
+
+
+    private Node connectNode(NodeGene nodeGene, Genome genome){
+        //adding a child:
+        // - create node
+        // - add node to this.nodes
+        Node node = new Node(nodeGene.isInputNode(), nodeGene.isOutputNode(), nodeGene.getNodeN());
+        this.nodes.add(node);
+        Map<NodeGene, List<Double>> childMap = genome.getConnections(nodeGene);
+        List<NodeGene> childNodes = childMap.keySet().stream().toList();
+        for(NodeGene childNodeGene: childNodes){
+            Node child = connectNode(childNodeGene, genome);
+            List<Double> childValues = childMap.get(childNodeGene);
+            node.addChild(child, childValues.get(0), childValues.get(1));
+        }
+        return node;
+    }
+
+    private boolean buildGraph(Genome genome){
+        List<NodeGene> outputNodes = genome.getOutputNodes();
+        List<NodeGene> visitedSet = new ArrayList<>();
+        Stack<NodeGene> stack = new Stack<>();
+        for(NodeGene outputNode : outputNodes){
+            stack.push(outputNode);
+        }
+        while(!stack.isEmpty()){
+            NodeGene nodeGene = stack.pop();
+            if(visitedSet.contains(nodeGene)){
+                return false;
+            }
+            visitedSet.add(nodeGene);
+            Map<NodeGene,List<Double>> childMap = genome.getConnections(nodeGene);
+            List<NodeGene> children = childMap.keySet().stream().toList();
+            for(NodeGene childNode : children){
+                stack.push(childNode);
+            }
+        }
+
+        //if this genome represents a cyclical graph, this will never terminate.
+        //therefore we must track which nodes we have visited, so that id
+        for(NodeGene outputNodeGene: genome.getOutputNodes()){
+            this.connectNode(outputNodeGene, genome);
+        }
+        return true;
+
+
+        /*
         List<NodeGene> nodeGenes = genome.getNodes();
+        System.out.println("Building graph with "+genome.getOutputNodes().size() + " output nodes");
         for(NodeGene gene : nodeGenes){
+            if(gene.isOutputNode()){
+                System.out.println("Output node "+gene);
+            }
             //Gets the children of this current NodeGene
             Map<NodeGene, List<Double>> childMap = genome.getConnections(gene);
             List<NodeGene> childNodes = childMap.keySet().stream().toList();
@@ -27,7 +83,12 @@ public class ComputationalGraph {
                     nodeChildren.add(existingNodes.get(0));
                 }
             }
-            Node node = new Node(gene.isInputNode(), gene.isOutputNode(), gene.getNodeN());
+            Node node;
+            if(!this.getNodeNs().contains(gene.getNodeN())) {
+                node = new Node(gene.isInputNode(), gene.isOutputNode(), gene.getNodeN());
+            }else{
+                continue;
+            }
             int i = 0;
             for(Node child : nodeChildren) {
                 List<Double> childValues = childMap.get(childNodes.get(i));
@@ -36,6 +97,19 @@ public class ComputationalGraph {
             }
             this.nodes.add(node);
         }
+        List<Integer> encountered = new ArrayList<>();
+        for(Node node : this.nodes){
+            if(!encountered.contains(node.getNodeN())){
+                encountered.add(node.getNodeN());
+            }else{
+                System.out.println("Duplicate of node "+node.getNodeN());
+                String x = node.isOutputNode() ? "IS OUTPUT" : "IS NOT OUTPUT";
+                System.out.println("This duplicate " + x);
+            }
+        }
+        System.out.println("after building graph there are " + this.getOutputNodes().size() + " output nodes");
+
+         */
     }
 
     public List<Node> getOutputNodes(){
@@ -54,6 +128,7 @@ public class ComputationalGraph {
             //NODE side: if node.isInput: return weight*input
             outputs.add(outputNodes.get(i).calc(inputs));
         }
+        //this.printFeedforward(inputs);
         return outputs;
     }
 
@@ -67,15 +142,7 @@ public class ComputationalGraph {
         }
         System.out.println(s);
     }
-/*
-    public void printGraph(){
-        List<Node> outputNodes = this.getOutputNodes();
-        for(Node node : outputNodes){
-            System.out.println("Output Node:");
-            System.out.println(node.toString());
-        }
-    }
-*/
+
 
     private double MSE(List<Double> networkOutput, double[] targetValues){
         double r = 0.0;
@@ -101,12 +168,15 @@ public class ComputationalGraph {
     }
 
     private boolean hasCycle(){
+        System.out.println("2");
         List<Node> outputNodes = this.getOutputNodes();
         List<Node> visitedSet = new ArrayList<>();
         Stack<Node> stack = new Stack<>();
+        System.out.println("2");
         for(Node outputNode : outputNodes){
             stack.push(outputNode);
         }
+        System.out.println("2");
         while(!stack.isEmpty()){
             Node node = stack.pop();
             if(visitedSet.contains(node)){
@@ -117,6 +187,7 @@ public class ComputationalGraph {
                 stack.push(childNode);
             }
         }
+        System.out.println("2");
         return false;
     }
 
@@ -125,7 +196,6 @@ public class ComputationalGraph {
     }
 
     public void printGraph(double[] inputs){
-        //graph will have to be printed in the terminal, Java plotting libraries look heavy.
         //this.nodes contains a list of all the nodes
         //we can access the input nodes via this.getInputNodes()
 
@@ -135,7 +205,6 @@ public class ComputationalGraph {
         for(Node outputNode : outputNodes){
             outputNode.setDepth(0);
         }
-        System.out.println("1");
         List<List<Node>> nodeMap = new ArrayList<>();
         int d = 0;
         while(true){
@@ -146,7 +215,6 @@ public class ComputationalGraph {
             nodeMap.add(layer);
             d+=1;
         }
-        System.out.println("1");
         //node map currently contains the output nodes at 0 and further layers going on from that.
         //node map now contains deepest layer first.
         Collections.reverse(nodeMap);
@@ -175,5 +243,9 @@ public class ComputationalGraph {
             //+ "Weight: " + node.getWeight() + " Bias: " + node.getBias()
         }
         System.out.println(s);
+    }
+
+    public List<Node> getNodes(){
+        return this.nodes;
     }
 }

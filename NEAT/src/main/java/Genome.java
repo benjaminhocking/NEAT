@@ -7,6 +7,7 @@ public class Genome {
     private Population population;
     private int inN;
     private int outN;
+    private List<String> mutationLog;
 
     public Genome(Population population, int inN, int outN){
         this.nodeCounter = 0;
@@ -14,7 +15,17 @@ public class Genome {
         this.population = population;
         this.inN = inN;
         this.outN = outN;
+        this.mutationLog = new ArrayList<>();
     }
+
+    private void logMutation(String s){
+        this.mutationLog.add(s);
+    }
+
+    public List<String> getMutationLog(){
+        return this.mutationLog;
+    }
+
 
     public int getInputSize(){
         return this.inN;
@@ -80,12 +91,23 @@ public class Genome {
         return c1.stream().filter(cg -> !innovationNs2.contains(cg.getInnovationNumber())).toList();
     }
 
-    //either i can make a constructor class that takes in a list of connection genes, and creates a Genome object
-    //Or i can make a: mateWith() function that mates this genome with another fitter genome.
+    public String stringGenome(){
+        String s = "";
+        for(Gene gene : this.genes){
+            if(gene instanceof ConnectionGene){
+                s += " ConnectionGene: " + ((ConnectionGene)gene).toString();
+            }
+            if(gene instanceof NodeGene){
+                s += " NodeGene: " + ((NodeGene)gene).toString();
+            }
+        }
+        return s;
+    }
 
     public void mateWith(Genome genome){
         List<ConnectionGene> genes1 = this.getConnectionGenes();
         List<ConnectionGene> genes2 = genome.getConnectionGenes();
+        logMutation("Mate With: " + genome.stringGenome());
 
         List<ConnectionGene> newGenes = new ArrayList<>();
         //Chooses randomly between each parent for all matching genes.
@@ -112,7 +134,10 @@ public class Genome {
         this.nodeCounter = 0;
     }
 
+    
+
     private void reconstituteGenome(List<ConnectionGene> connectionGenes){
+        //System.out.println("before reconstitution there are "+this.getOutputNodes().size()+" output nodes");
         List<Integer> allNodes = new ArrayList<>();
         for(ConnectionGene connectionGene : connectionGenes){
             if(!allNodes.contains(connectionGene.getIn())){
@@ -124,6 +149,8 @@ public class Genome {
         }
         Map<Integer,NodeGene> currentNodes = this.getNodeGenesMap();
         this.emptyGenes();
+        logMutation("After emptying genes there are "+this.genes.size() + " genes");
+        //System.out.println("In the currentNodes var we now have "+currentNodes.size() + " nodes");
         for(Integer nodeN : allNodes){
             boolean inputNode = false;
             boolean outputNode = false;
@@ -132,10 +159,12 @@ public class Genome {
                 outputNode = currentNodes.get(nodeN).isOutputNode();
             }
             NodeGene nodeGene = new NodeGene(nodeN, inputNode, outputNode);
+            logMutation("Reconstitute NodeGene "+nodeN);
             this.genes.add(nodeGene);
             this.nodeCounter++;
         }
         this.genes.addAll(connectionGenes);
+        //System.out.println("after reconstitution there are "+this.getOutputNodes().size()+" output nodes");
     }
 
     private void removeConnectionGene(ConnectionGene connectionGene){
@@ -143,7 +172,6 @@ public class Genome {
         node1: in
         node2: out
          */
-        this.population.decrementInnovationNumber();
         this.genes.remove(connectionGene);
     }
 
@@ -218,6 +246,7 @@ public class Genome {
             if(gene instanceof ConnectionGene){
                 if(Math.random()<weightMutationProbability){
                     ((ConnectionGene) gene).mutateWeight(learningRate);
+                    logMutation("Mutate Weight " + ((ConnectionGene) gene));
                 }
             }
         }
@@ -228,6 +257,7 @@ public class Genome {
             if(gene instanceof ConnectionGene){
                 if(Math.random()<weightMutationProbability){
                     ((ConnectionGene) gene).mutateBias(learningRate);
+                    logMutation("Mutate Bias " + ((ConnectionGene) gene));
                 }
             }
         }
@@ -235,7 +265,6 @@ public class Genome {
 
     private NodeGene getRandomNode(List<NodeGene> nodes){
         int index = (int)Math.floor(Math.random()*nodes.size());
-        System.out.println("Get at index: "+ Math.floor(Math.random()*nodes.size()));
         return nodes.get(index);
     }
 
@@ -263,7 +292,12 @@ public class Genome {
 
 
     private boolean isCyclical(){
+        System.out.println("3");
         ComputationalGraph cg = new ComputationalGraph(this);
+        if(!cg.valid){
+            return true;
+        }
+        System.out.println("3");
         return cg.isCyclical();
     }
 
@@ -310,21 +344,23 @@ public class Genome {
             return;
         }
         if(!this.isConnected(inNode.getNodeN(), outNode.getNodeN())){
+            int preInnovationN = this.population.getInnovationNumber();
             ConnectionGene connectionGene = this.newConnectionGene(inNode, outNode, Math.random(), 0);
             if(this.isCyclical()){
                 this.removeConnectionGene(connectionGene);
+                if(preInnovationN!=this.population.getInnovationNumber()){
+                    this.population.setInnovationNumber(preInnovationN);
+                }
             }
+            logMutation("Add Connection Gene. InNode: " +inNode + " OutNode: "+outNode + " Connection Gene: "+connectionGene);
         }
     }
 
     public void addNodeGene(){
-        //System.out.println("Node Counter: "+this.nodeCounter);
         //get an existing connection, add new node c, delete existing connection from a -> b, and create connection a -> c, c -> b.
 
         List<ConnectionGene> connectionGenes = this.getConnectionGenes();
         ConnectionGene connectionGene =  connectionGenes.get((int)Math.floor(Math.random()*(connectionGenes.size())));
-        System.out.println("Breaking up this connection in addNodeGene():");
-        System.out.println(connectionGene);
 
         int inNodeN = connectionGene.getIn();
         NodeGene nodeIn = this.getNodeGene(inNodeN);
@@ -336,24 +372,20 @@ public class Genome {
 
         //STRUCTURAL INNOVATION
         NodeGene nodeGene = this.newNodeGene(false, false);
+        logMutation("Add Node Gene: " + nodeGene);
         this.deleteConnectionGene(connectionGene);
-
-        System.out.println("New node gene: " +nodeGene);
 
         //connect a -> c, give this a weight of 1.
         //STRUCTURAL INNOVATION
         ConnectionGene ac = this.newConnectionGene(nodeIn, nodeGene, Math.random(), Math.random());
-
-        System.out.println("New connection a->c:");
-        System.out.println(ac);
+        logMutation("Connect New Node Gene: " + ac);
 
 
 
         //connect c -> b, give this the same weight as the old
         //STRUCTURAL INNOVATION
         ConnectionGene cb = this.newConnectionGene(nodeGene, nodeOut, Math.random(), Math.random());
-        System.out.println("New connection c->b:");
-        System.out.println(cb);
+        logMutation("Connect New Node Gene: " + cb);
     }
 
 
@@ -381,5 +413,39 @@ public class Genome {
         return genome;
     }
 
+    public int getNConnectionGenes(){
+        return this.getConnectionGenes().size();
+    }
+
+    private double avgWeightDifference(Genome g1){
+        List<ConnectionGene> genes = this.getConnectionGenes();
+        List<ConnectionGene> genes1 = g1.getConnectionGenes();
+        double s = 0;
+        double n = 0;
+        for (ConnectionGene gene1 : genes) {
+            for (ConnectionGene gene2 : genes1) {
+                if (gene1.getInnovationNumber() == gene2.getInnovationNumber()) {
+                    s += Math.abs(gene1.getWeight() - gene2.getWeight());
+                    n++;
+                    break;
+                }
+            }
+        }
+        return s/n;
+    }
+
+    public double delta(Genome g1){
+        //parameters
+        double c1 = 1.0;
+        double c2 = 0.4;
+
+        //Calculates the delta (for use in speciation) between this genome and g1
+        //delta = (c1 * D)/N + c2 * W
+        double E = this.getDisjointGenes(g1.getConnectionGenes()).size() + g1.getDisjointGenes(this.getConnectionGenes()).size();
+        double N = Math.max(this.getNConnectionGenes(), g1.getNConnectionGenes());
+        double W = this.avgWeightDifference(g1);
+
+        return (c1 * E)/N + c2 * W;
+    }
 
 }

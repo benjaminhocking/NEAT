@@ -17,7 +17,7 @@ public class Main implements ActionListener {
      [x] Innovation Number:
         [x] Track and compare innovations from this generation so that new innovation numbers
           are not awarded for the same innovation.
-     - Crossover
+     [x] Crossover
      - Speciation
      */
 
@@ -31,10 +31,10 @@ public class Main implements ActionListener {
         put(new double[]{0.0,0.0}, new double[]{0.0});
         put(new double[]{0.0,1.0}, new double[]{1.0});
         put(new double[]{1.0,0.0}, new double[]{1.0});
-        put(new double[]{1.0,1.0}, new double[]{12.0});
+        put(new double[]{1.0,1.0}, new double[]{3.0});
     }};
 
-    int epochs = 50;
+    int epochs = 1000;
 
     int inN = 2;
     int outN = 1;
@@ -44,7 +44,8 @@ public class Main implements ActionListener {
     double weightMutationProbability = 0.5;
     double addConnectionProbability = 0.4;
     double addNodeProbability = 0.4;
-    double learningRate = 0.05;
+    double learningRate = 0.01;
+    double deltaThreshold = 1.0;
 
     public Main(){
         //Initialises frame.
@@ -94,7 +95,7 @@ public class Main implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         //start(inN, outN, n, genomeWeightMutationProbability, weightMutationProbability, addConnectionProbability, addNodeProbability, learningRate);
-        EvolutionTask evolutionTask = new EvolutionTask(this.frame, this.graphPanel, this.genomePanel, this.label, this.inN, this.outN, this.n, this.genomeWeightMutationProbability, this.weightMutationProbability, this.addConnectionProbability, this.addNodeProbability, this.learningRate, this.dataset, this.epochs);
+        EvolutionTask evolutionTask = new EvolutionTask(this.frame, this.graphPanel, this.genomePanel, this.label, this.inN, this.outN, this.n, this.genomeWeightMutationProbability, this.weightMutationProbability, this.addConnectionProbability, this.addNodeProbability, this.learningRate, this.dataset, this.epochs, this.deltaThreshold);
         evolutionTask.execute();
         label.setText("Generation Number: 0");
     }
@@ -115,12 +116,13 @@ public class Main implements ActionListener {
         double addConnectionProbability;
         double addNodeProbability;
         double learningRate;
+        double deltaThreshold;
         JFrame frame;
         JLabel label;
         JPanel graphPanel;
         JPanel genomePanel;
 
-        public EvolutionTask(JFrame frame, JPanel graphPanel, JPanel genomePanel, JLabel label, int inN, int outN, int n, double genomeWeightMutationProbability, double weightMutationProbability, double addConnectionProbability, double addNodeProbability, double learningRate, Map<double[],double[]> dataset, int epochs){
+        public EvolutionTask(JFrame frame, JPanel graphPanel, JPanel genomePanel, JLabel label, int inN, int outN, int n, double genomeWeightMutationProbability, double weightMutationProbability, double addConnectionProbability, double addNodeProbability, double learningRate, Map<double[],double[]> dataset, int epochs, double deltaThreshold){
             this.frame = frame;
             this.graphPanel = graphPanel;
             this.genomePanel = genomePanel;
@@ -135,21 +137,36 @@ public class Main implements ActionListener {
             this.learningRate = learningRate;
             this.dataset = dataset;
             this.epochs = epochs;
-            this.population = new Population(inN, outN, n, genomeWeightMutationProbability, weightMutationProbability, addConnectionProbability, addNodeProbability, learningRate);
+            this.deltaThreshold = deltaThreshold;
+            this.population = new Population(inN, outN, n, genomeWeightMutationProbability, weightMutationProbability, addConnectionProbability, addNodeProbability, learningRate, deltaThreshold);
         }
 
         @Override
         protected Void doInBackground() throws Exception {
-            /*
+
 
             this.population.initPopulation();
             this.population.setDataset(dataset);
 
             this.population.printOrganism(0);
             for (int i = 0; i < epochs; i++) {
-                this.population.stepGeneration();
-                updateGenerationCount(i);
+                try {
+                    this.population.stepGeneration();
+                    updateGenerationCount(i);
+                }catch(Exception e){
+                    e.printStackTrace();
+                    this.printGenome(0);
+                    return null;
+                }
             }
+
+            Network champion = this.population.getChampion();
+            double championLoss = this.population.getChampionLoss();
+            System.out.println(championLoss);
+
+            this.updateGraph(champion);
+
+            /*
             this.printGenome(0);
             this.printGenome(1);
             this.updateGraph(0);
@@ -159,9 +176,11 @@ public class Main implements ActionListener {
             this.updateGraph(0);
             System.out.println(this.population.getNetwork(0).getGenome().getConnectionGenes());
             System.out.println(this.population.getNewInnovations().size());
-
              */
 
+
+
+            /*
             this.population.initPopulation();
 
             Genome g1 = this.population.getNetwork(0).getGenome();
@@ -181,6 +200,8 @@ public class Main implements ActionListener {
             }
             this.updateGraph(0);
 
+             */
+
             return null;
         }
 
@@ -196,15 +217,11 @@ public class Main implements ActionListener {
             }
         }
 
-        private void updateGraph(int n){
-            Network network = this.population.getNetwork(n);
+        private void updateGraph(Network network){
             VisualizationImageServer vs = network.printGraph();
-            System.out.println("2");
             this.graphPanel.add(vs);
-            System.out.println("2");
             this.graphPanel.revalidate();
             this.frame.revalidate();
-            System.out.println("2");
         }
 
         private void printGenome(int n){

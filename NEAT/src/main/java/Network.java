@@ -19,12 +19,32 @@ public class Network {
     private int inN;
     private int outN;
     private Population population;
+    private double lastLoss;
+    private int speciesN;
     public Network(int inN, int outN, Population population){
         this.inN = inN;
         this.outN = outN;
         this.population = population;
         this.genome = new Genome(population, this.inN, this.outN);
         this.genome.initializeGenome();
+        this.lastLoss = 0;
+        this.speciesN = 0;
+    }
+
+    public void setSpeciesN(int speciesN){
+        this.speciesN = speciesN;
+    }
+
+    public int getSpeciesN(){
+        return this.speciesN;
+    }
+
+    public void setLastLoss(double d){
+        this.lastLoss = d;
+    }
+
+    public double getLastLoss(){
+        return this.lastLoss;
     }
 
     public void printInfo(){
@@ -53,8 +73,6 @@ public class Network {
             this.genome.mutateBiases(weightMutationProbability, learningRate);
         }
 
-        //now we must track which structural innovations happen.
-        List<Gene> newInnovations = new ArrayList<>();
         if(Math.random()<addConnectionProbability){
             //add connection
             this.genome.addConnectionGene();
@@ -115,7 +133,6 @@ public class Network {
                 return vertex;
             }
         };
-        System.out.println("1");
         Transformer<String, String> edgeLabelTransformer = new Transformer<String, String>() {
             @Override
             public String transform(String edge) {
