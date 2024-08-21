@@ -1,5 +1,5 @@
 # Aim
-The aim of this project was to build a general implementation of the Neuro-Evolution for Augmenting Topologies architecture that could be used to control an agent in a general game. The implementation of scoring for the game is outside the scope of this project, and should be created on a per-case basis. In my case this was the Scotland Yard board game.
+The aim of this project was to build a general implementation of the Neuro-Evolution of Augmenting Topologies architecture that could be used to control an agent in a general game. The implementation of scoring for the game is outside the scope of this project, and should be created on a per-case basis. In my case this was the Scotland Yard board game.
 # The NEAT Method
 
 ## Overview
